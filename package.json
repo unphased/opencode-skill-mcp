@@ -1,0 +1,32 @@
+{
+  "name": "opencode-skill-mcp",
+  "version": "0.1.0",
+  "description": "Standalone skill-based MCP activation and dispatch plugin for OpenCode",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@opencode-ai/plugin": "^0.0.15",
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  },
+  "peerDependencies": {
+    "zod": "^3.23.0"
+  },
+  "files": [
+    "dist"
+  ],
+  "license": "MIT"
+}
