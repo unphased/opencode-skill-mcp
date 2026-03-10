@@ -15,11 +15,11 @@ export interface SkillDefinition {
 export class SkillRegistry {
   private skills: Map<string, SkillDefinition> = new Map()
 
-  async loadSkillFromPath(skillPath: string): Promise<SkillDefinition | null> {
+  async loadSkillFromPath(skillPath: string, nameOverride?: string): Promise<SkillDefinition | null> {
     try {
       const content = await fs.readFile(skillPath, "utf-8")
       const resolvedPath = dirname(skillPath)
-      const defaultName = basename(skillPath, ".md")
+      const name = nameOverride ?? basename(skillPath, ".md")
 
       // Parse frontmatter for description
       let description = ""
@@ -43,7 +43,6 @@ export class SkillRegistry {
       const mcpJsonMcp = await loadMcpJsonFromDir(resolvedPath)
       const mcpConfig = mcpJsonMcp || frontmatterMcp
 
-      const name = defaultName
       const skill: SkillDefinition = {
         name,
         description,
@@ -67,11 +66,11 @@ export class SkillRegistry {
         if (entry.isFile() && entry.name.endsWith(".md")) {
           await this.loadSkillFromPath(join(dir, entry.name))
         } else if (entry.isDirectory()) {
-          // Check for index.md inside directory-based skills
+          // Check for index.md inside directory-based skills — use folder name as skill name
           const indexPath = join(dir, entry.name, "index.md")
           try {
             await fs.access(indexPath)
-            await this.loadSkillFromPath(indexPath)
+            await this.loadSkillFromPath(indexPath, entry.name)
           } catch {
             // No index.md — skip
           }

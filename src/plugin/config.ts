@@ -30,12 +30,14 @@ export async function loadMcpJsonFromDir(skillDir: string): Promise<SkillMcpConf
       return parsed.mcpServers as SkillMcpConfig
     }
 
-    // Flat format: { "serverName": { "command": "..." } }
+    // Flat format: { "serverName": { "command": "..." } } or { "serverName": { "url": "..." } }
     if (parsed && typeof parsed === "object" && !("mcpServers" in parsed)) {
-      const hasCommandField = Object.values(parsed).some(
-        (value) => value && typeof value === "object" && "command" in (value as Record<string, unknown>),
-      )
-      if (hasCommandField) {
+      const hasServerEntry = Object.values(parsed).some((value) => {
+        if (!value || typeof value !== "object") return false
+        const v = value as Record<string, unknown>
+        return "command" in v || "url" in v
+      })
+      if (hasServerEntry) {
         return parsed as SkillMcpConfig
       }
     }

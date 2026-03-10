@@ -7,7 +7,7 @@ import { formatMcpCapabilities } from "./capabilities"
 
 // --- skill_mcp tool ---
 
-interface SkillMcpArgs {
+export interface SkillMcpArgs {
   mcp_name: string
   tool_name?: string
   resource_name?: string
@@ -16,9 +16,9 @@ interface SkillMcpArgs {
   grep?: string
 }
 
-type OperationType = { type: "tool" | "resource" | "prompt"; name: string }
+export type OperationType = { type: "tool" | "resource" | "prompt"; name: string }
 
-function validateOperationParams(args: SkillMcpArgs): OperationType {
+export function validateOperationParams(args: SkillMcpArgs): OperationType {
   const operations: OperationType[] = []
   if (args.tool_name) operations.push({ type: "tool", name: args.tool_name })
   if (args.resource_name) operations.push({ type: "resource", name: args.resource_name })
@@ -53,7 +53,7 @@ function validateOperationParams(args: SkillMcpArgs): OperationType {
   return operations[0]
 }
 
-function parseArguments(argsJson: string | Record<string, unknown> | undefined): Record<string, unknown> {
+export function parseArguments(argsJson: string | Record<string, unknown> | undefined): Record<string, unknown> {
   if (!argsJson) return {}
   if (typeof argsJson === "object" && argsJson !== null) return argsJson
   try {
@@ -73,7 +73,7 @@ function parseArguments(argsJson: string | Record<string, unknown> | undefined):
   }
 }
 
-function applyGrepFilter(output: string, pattern: string | undefined): string {
+export function applyGrepFilter(output: string, pattern: string | undefined): string {
   if (!pattern) return output
   try {
     const regex = new RegExp(pattern, "i")
@@ -131,7 +131,7 @@ export function createSkillMcpTool(options: {
             `Available MCP servers in loaded skills:\n` +
             formatAvailableMcps(skills) +
             `\n\n` +
-            `Hint: Load the skill first using the 'skill' tool, then call skill_mcp.`,
+            `Hint: Ensure the skill directory contains a valid mcp.json with this server name.`,
         )
       }
 

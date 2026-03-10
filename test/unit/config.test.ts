@@ -1,5 +1,8 @@
-import { describe, it, expect } from "vitest"
-import { parseSkillMcpConfigFromFrontmatter } from "../../src/plugin/config"
+import { describe, it, expect, beforeEach, afterEach } from "vitest"
+import { promises as fs } from "node:fs"
+import { join } from "node:path"
+import { tmpdir } from "node:os"
+import { parseSkillMcpConfigFromFrontmatter, loadMcpJsonFromDir } from "../../src/plugin/config"
 
 describe("parseSkillMcpConfigFromFrontmatter", () => {
   it("extracts mcp config from frontmatter", () => {
@@ -45,5 +48,55 @@ mcp:
 body`
     const config = parseSkillMcpConfigFromFrontmatter(content)
     expect(config?.remote?.url).toBe("https://mcp.example.com/mcp")
+  })
+})
+
+describe("loadMcpJsonFromDir", () => {
+  let testDir: string
+
+  beforeEach(async () => {
+    testDir = await fs.mkdtemp(join(tmpdir(), "mcp-config-test-"))
+  })
+
+  afterEach(async () => {
+    await fs.rm(testDir, { recursive: true, force: true })
+  })
+
+  it("loads standard mcpServers format", async () => {
+    await fs.writeFile(
+      join(testDir, "mcp.json"),
+      JSON.stringify({ mcpServers: { "my-server": { command: "node", args: ["server.js"] } } }),
+    )
+    const config = await loadMcpJsonFromDir(testDir)
+    expect(config?.["my-server"]?.command).toBe("node")
+  })
+
+  it("loads flat format with command field", async () => {
+    await fs.writeFile(
+      join(testDir, "mcp.json"),
+      JSON.stringify({ "my-server": { command: "node", args: ["server.js"] } }),
+    )
+    const config = await loadMcpJsonFromDir(testDir)
+    expect(config?.["my-server"]?.command).toBe("node")
+  })
+
+  it("loads flat format with url field (remote server)", async () => {
+    await fs.writeFile(
+      join(testDir, "mcp.json"),
+      JSON.stringify({ remote: { url: "https://mcp.example.com/mcp" } }),
+    )
+    const config = await loadMcpJsonFromDir(testDir)
+    expect(config?.remote?.url).toBe("https://mcp.example.com/mcp")
+  })
+
+  it("returns undefined when no mcp.json exists", async () => {
+    const config = await loadMcpJsonFromDir(testDir)
+    expect(config).toBeUndefined()
+  })
+
+  it("returns undefined for unrecognized format", async () => {
+    await fs.writeFile(join(testDir, "mcp.json"), JSON.stringify({ random: "data" }))
+    const config = await loadMcpJsonFromDir(testDir)
+    expect(config).toBeUndefined()
   })
 })
