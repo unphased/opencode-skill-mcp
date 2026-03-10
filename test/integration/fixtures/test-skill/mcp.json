@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "echo-test": {
+      "command": "bun",
+      "args": ["run", "ECHO_SERVER_PATH"]
+    }
+  }
+}

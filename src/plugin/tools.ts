@@ -1,4 +1,5 @@
-import { tool, type ToolDefinition } from "@opencode-ai/plugin"
+import { tool } from "@opencode-ai/plugin"
+import type { ToolDefinition, ToolContext } from "@opencode-ai/plugin"
 import type { SkillMcpManager } from "../core/manager"
 import type { SkillMcpClientInfo, SkillMcpServerContext } from "../core/types"
 import type { SkillRegistry, SkillDefinition } from "./registry"
@@ -99,9 +100,8 @@ function formatAvailableMcps(skills: SkillDefinition[]): string {
 export function createSkillMcpTool(options: {
   manager: SkillMcpManager
   registry: SkillRegistry
-  getSessionID: () => string
 }): ToolDefinition {
-  const { manager, registry, getSessionID } = options
+  const { manager, registry } = options
 
   return tool({
     description:
@@ -120,7 +120,7 @@ export function createSkillMcpTool(options: {
         .optional()
         .describe("Regex pattern to filter output lines (only matching lines returned)"),
     },
-    async execute(args: SkillMcpArgs) {
+    async execute(args: SkillMcpArgs, ctx: ToolContext) {
       const operation = validateOperationParams(args)
       const skills = registry.listLoadedSkills()
       const found = registry.resolveServer(args.mcp_name)
@@ -138,9 +138,9 @@ export function createSkillMcpTool(options: {
       const info: SkillMcpClientInfo = {
         serverName: args.mcp_name,
         skillName: found.skill.name,
-        sessionID: getSessionID(),
+        sessionID: ctx.sessionID,
       }
-      const context: SkillMcpServerContext = {
+      const serverContext: SkillMcpServerContext = {
         config: found.config,
         skillName: found.skill.name,
       }
@@ -150,12 +150,12 @@ export function createSkillMcpTool(options: {
       let output: string
       switch (operation.type) {
         case "tool": {
-          const result = await manager.callTool(info, context, operation.name, parsedArgs)
+          const result = await manager.callTool(info, serverContext, operation.name, parsedArgs)
           output = JSON.stringify(result, null, 2)
           break
         }
         case "resource": {
-          const result = await manager.readResource(info, context, operation.name)
+          const result = await manager.readResource(info, serverContext, operation.name)
           output = JSON.stringify(result, null, 2)
           break
         }
@@ -164,7 +164,7 @@ export function createSkillMcpTool(options: {
           for (const [key, value] of Object.entries(parsedArgs)) {
             stringArgs[key] = String(value)
           }
-          const result = await manager.getPrompt(info, context, operation.name, stringArgs)
+          const result = await manager.getPrompt(info, serverContext, operation.name, stringArgs)
           output = JSON.stringify(result, null, 2)
           break
         }
@@ -179,16 +179,15 @@ export function createSkillMcpTool(options: {
 export function createSkillTool(options: {
   registry: SkillRegistry
   manager: SkillMcpManager
-  getSessionID: () => string
 }): ToolDefinition {
-  const { registry, manager, getSessionID } = options
+  const { registry, manager } = options
 
   return tool({
     description: "Load a skill by name to activate its instructions and available MCP servers.",
     args: {
       name: tool.schema.string().describe("The skill name to load"),
     },
-    async execute(args: { name: string }) {
+    async execute(args: { name: string }, ctx: ToolContext) {
       const skill = registry.getSkill(args.name)
       if (!skill) {
         const available = registry.listSkills().map((s) => s.name)
@@ -202,7 +201,7 @@ export function createSkillTool(options: {
       const output = [`## Skill: ${skill.name}`, "", `**Base directory**: ${skill.resolvedPath}`, "", skill.template]
 
       if (skill.mcpConfig) {
-        const mcpInfo = await formatMcpCapabilities(skill, manager, getSessionID())
+        const mcpInfo = await formatMcpCapabilities(skill, manager, ctx.sessionID)
         if (mcpInfo) output.push(mcpInfo)
       }
 

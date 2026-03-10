@@ -9,11 +9,14 @@
     "build": "tsc",
     "dev": "tsc --watch",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:integration": "bash test/integration/run.sh cli",
+    "test:tui": "bash test/integration/run.sh tui",
+    "test:all": "vitest run && bash test/integration/run.sh"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
-    "@opencode-ai/plugin": "^0.0.15",
+    "@opencode-ai/plugin": "^1.2.20",
     "js-yaml": "^4.1.0"
   },
   "devDependencies": {
@@ -23,7 +26,7 @@
     "vitest": "^3.0.0"
   },
   "peerDependencies": {
-    "zod": "^3.23.0"
+    "zod": "^4.1.0"
   },
   "files": [
     "dist"
