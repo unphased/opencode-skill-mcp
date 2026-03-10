@@ -2,10 +2,7 @@ import { tool } from "@opencode-ai/plugin"
 import type { ToolDefinition, ToolContext } from "@opencode-ai/plugin"
 import type { SkillMcpManager } from "../core/manager"
 import type { SkillMcpClientInfo, SkillMcpServerContext } from "../core/types"
-import type { SkillRegistry, SkillDefinition } from "./registry"
-import { formatMcpCapabilities } from "./capabilities"
-
-// --- skill_mcp tool ---
+import type { ActivatedSkill } from "./registry"
 
 export interface SkillMcpArgs {
   mcp_name: string
@@ -85,7 +82,21 @@ export function applyGrepFilter(output: string, pattern: string | undefined): st
   }
 }
 
-function formatAvailableMcps(skills: SkillDefinition[]): string {
+function resolveServer(
+  mcpName: string,
+  skills: ActivatedSkill[],
+): { skill: ActivatedSkill; config: NonNullable<ActivatedSkill["mcpConfig"]>[string] } | null {
+  for (let index = skills.length - 1; index >= 0; index -= 1) {
+    const skill = skills[index]
+    if (skill.mcpConfig && mcpName in skill.mcpConfig) {
+      return { skill, config: skill.mcpConfig[mcpName] }
+    }
+  }
+
+  return null
+}
+
+function formatAvailableMcps(skills: ActivatedSkill[]): string {
   const mcps: string[] = []
   for (const skill of skills) {
     if (skill.mcpConfig) {
@@ -99,15 +110,15 @@ function formatAvailableMcps(skills: SkillDefinition[]): string {
 
 export function createSkillMcpTool(options: {
   manager: SkillMcpManager
-  registry: SkillRegistry
+  getLoadedSkills: (sessionID: string) => ActivatedSkill[]
 }): ToolDefinition {
-  const { manager, registry } = options
+  const { manager, getLoadedSkills } = options
 
   return tool({
     description:
-      "Invoke MCP server operations from skill-embedded MCPs. Requires mcp_name plus exactly one of: tool_name, resource_name, or prompt_name.",
+      "Invoke MCP server operations from skills loaded in the current session. Requires mcp_name plus exactly one of: tool_name, resource_name, or prompt_name.",
     args: {
-      mcp_name: tool.schema.string().describe("Name of the MCP server from skill config"),
+      mcp_name: tool.schema.string().describe("Name of the MCP server from the active skill context"),
       tool_name: tool.schema.string().optional().describe("MCP tool to call"),
       resource_name: tool.schema.string().optional().describe("MCP resource URI to read"),
       prompt_name: tool.schema.string().optional().describe("MCP prompt to get"),
@@ -122,16 +133,16 @@ export function createSkillMcpTool(options: {
     },
     async execute(args: SkillMcpArgs, ctx: ToolContext) {
       const operation = validateOperationParams(args)
-      const skills = registry.listLoadedSkills()
-      const found = registry.resolveServer(args.mcp_name)
+      const loadedSkills = getLoadedSkills(ctx.sessionID)
+      const found = resolveServer(args.mcp_name, loadedSkills)
 
       if (!found) {
         throw new Error(
-          `MCP server "${args.mcp_name}" not found.\n\n` +
+          `MCP server "${args.mcp_name}" not found in skills loaded for this session.\n\n` +
             `Available MCP servers in loaded skills:\n` +
-            formatAvailableMcps(skills) +
+            formatAvailableMcps(loadedSkills) +
             `\n\n` +
-            `Hint: Ensure the skill directory contains a valid mcp.json with this server name.`,
+            `Hint: Load the relevant skill first using the built-in \`skill\` tool, then call \`skill_mcp\`.`,
         )
       }
 
@@ -169,43 +180,8 @@ export function createSkillMcpTool(options: {
           break
         }
       }
+
       return applyGrepFilter(output, args.grep)
-    },
-  })
-}
-
-// --- skill tool ---
-
-export function createSkillTool(options: {
-  registry: SkillRegistry
-  manager: SkillMcpManager
-}): ToolDefinition {
-  const { registry, manager } = options
-
-  return tool({
-    description: "Load a skill by name to activate its instructions and available MCP servers.",
-    args: {
-      name: tool.schema.string().describe("The skill name to load"),
-    },
-    async execute(args: { name: string }, ctx: ToolContext) {
-      const skill = registry.getSkill(args.name)
-      if (!skill) {
-        const available = registry.listSkills().map((s) => s.name)
-        const partialMatches = available.filter((n) => n.toLowerCase().includes(args.name.toLowerCase()))
-        if (partialMatches.length > 0) {
-          throw new Error(`Skill "${args.name}" not found. Did you mean: ${partialMatches.join(", ")}?`)
-        }
-        throw new Error(`Skill "${args.name}" not found. Available: ${available.join(", ") || "none"}`)
-      }
-
-      const output = [`## Skill: ${skill.name}`, "", `**Base directory**: ${skill.resolvedPath}`, "", skill.template]
-
-      if (skill.mcpConfig) {
-        const mcpInfo = await formatMcpCapabilities(skill, manager, ctx.sessionID)
-        if (mcpInfo) output.push(mcpInfo)
-      }
-
-      return output.join("\n")
     },
   })
 }

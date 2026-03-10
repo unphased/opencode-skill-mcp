@@ -96,7 +96,7 @@ setup_fixture() {
 EOF
 
   # Copy skill fixture, patching the echo server path
-  cp "$FIXTURE_DIR/test-skill/index.md" "$WORK_DIR/.opencode/skills/test-skill/index.md"
+  cp "$FIXTURE_DIR/test-skill/SKILL.md" "$WORK_DIR/.opencode/skills/test-skill/SKILL.md"
   local echo_server_path="$FIXTURE_DIR/echo-server.ts"
   sed "s|ECHO_SERVER_PATH|$echo_server_path|g" \
     "$FIXTURE_DIR/test-skill/mcp.json" > "$WORK_DIR/.opencode/skills/test-skill/mcp.json"
@@ -134,6 +134,18 @@ run_cli_tests() {
     head -5 "$config_tmp" 2>/dev/null | sed 's/^/    /'
   fi
 
+  echo ""
+  echo "--- debug skill ---"
+  local skill_tmp="$WORK_DIR/.test-skill-list"
+  run_opencode debug skill 2>&1 | cat > "$skill_tmp"
+
+  if grep -q '"name": "test-skill"' "$skill_tmp" 2>/dev/null; then
+    pass "test skill discovered by built-in skill loader"
+  else
+    fail "test skill not found in debug skill output"
+    head -10 "$skill_tmp" 2>/dev/null | sed 's/^/    /'
+  fi
+
   # Test 2: plugin loads without errors, skill_mcp tool registered
   echo ""
   echo "--- plugin loads + skill_mcp registered ---"
@@ -160,36 +172,36 @@ run_cli_tests() {
     fail "skill_mcp tool not registered"
   fi
 
-  # Test 3: skill_mcp dispatch — echo server end-to-end
+  # Test 3: built-in skill load + skill_mcp dispatch — echo server end-to-end
   echo ""
-  echo "--- skill_mcp dispatch (echo server) ---"
+  echo "--- built-in skill load + skill_mcp dispatch (echo server) ---"
   local echo_tmp="$WORK_DIR/.test-echo"
   run_opencode_timeout 120 run --format json -m "$MODEL" \
-    'Use skill_mcp to call the "echo" tool on the "echo-test" MCP server with arguments {"message": "integration-test-42"}. Report the exact output.' 2>&1 | cat > "$echo_tmp"
+    'Load the "test-skill" skill, then use skill_mcp to call the "echo" tool on the "echo-test" MCP server with arguments {"message": "integration-test-42"}. Report the exact output.' 2>&1 | cat > "$echo_tmp"
 
   if grep -q "Echo: integration-test-42" "$echo_tmp" 2>/dev/null; then
-    pass "skill_mcp echo dispatch returned correct result"
+    pass "built-in skill load + skill_mcp echo dispatch returned correct result"
   elif is_provider_connectivity_failure "$echo_tmp"; then
-    skip "skill_mcp echo dispatch skipped due to provider connectivity failure"
+    skip "built-in skill load + skill_mcp echo dispatch skipped due to provider connectivity failure"
   else
-    fail "skill_mcp echo dispatch did not return expected result"
+    fail "built-in skill load + skill_mcp echo dispatch did not return expected result"
     echo "    (last 3 lines):"
     tail -3 "$echo_tmp" 2>/dev/null | sed 's/^/    /'
   fi
 
-  # Test 4: skill_mcp dispatch — add tool
+  # Test 4: built-in skill load + skill_mcp dispatch — add tool
   echo ""
-  echo "--- skill_mcp dispatch (add tool) ---"
+  echo "--- built-in skill load + skill_mcp dispatch (add tool) ---"
   local add_tmp="$WORK_DIR/.test-add"
   run_opencode_timeout 120 run --format json -m "$MODEL" \
-    'Use skill_mcp to call the "add" tool on the "echo-test" MCP server with arguments {"a": 17, "b": 25}. Report the exact numeric result.' 2>&1 | cat > "$add_tmp"
+    'Load the "test-skill" skill, then use skill_mcp to call the "add" tool on the "echo-test" MCP server with arguments {"a": 17, "b": 25}. Report the exact numeric result.' 2>&1 | cat > "$add_tmp"
 
   if grep -q "42" "$add_tmp" 2>/dev/null; then
-    pass "skill_mcp add dispatch returned 42"
+    pass "built-in skill load + skill_mcp add dispatch returned 42"
   elif is_provider_connectivity_failure "$add_tmp"; then
-    skip "skill_mcp add dispatch skipped due to provider connectivity failure"
+    skip "built-in skill load + skill_mcp add dispatch skipped due to provider connectivity failure"
   else
-    fail "skill_mcp add dispatch did not return 42"
+    fail "built-in skill load + skill_mcp add dispatch did not return 42"
     echo "    (last 3 lines):"
     tail -3 "$add_tmp" 2>/dev/null | sed 's/^/    /'
   fi
@@ -252,7 +264,7 @@ run_tui_tests() {
   echo ""
   echo "--- TUI: skill_mcp echo dispatch ---"
   tmux send-keys -t opencode-test \
-    'Use skill_mcp to call "echo" on "echo-test" with arguments {"message": "tmux-test"}. Show the result.' Enter
+    'Load the "test-skill" skill, then use skill_mcp to call "echo" on "echo-test" with arguments {"message": "tmux-test"}. Show the result.' Enter
 
   if tmux_wait_for opencode-test "Echo:.*tmux-test|tmux.test" 60; then
     pass "TUI: skill_mcp echo returned expected result"
