@@ -2,7 +2,7 @@
 
 ## Goal
 
-Build a standalone OpenCode plugin that provides OMO-style skill-based MCP activation and dispatch (`skill` + `skill_mcp`) without depending on other OMO features.
+Build a standalone OpenCode plugin that provides OMO-style skill-based MCP dispatch via skill-local MCP config plus a `skill_mcp` tool, while relying on OpenCode's built-in `skill` tool for skill activation.
 
 This doc is the working tracker and implementation blueprint.
 
@@ -83,7 +83,7 @@ OMO adds a skill-scoped orchestration layer:
 ### MVP
 
 1. Skill loader with MCP discovery (`mcp.json` and optional frontmatter `mcp`)
-2. `skill` tool to load a skill and render available MCP servers/tools
+2. Compatibility with OpenCode's built-in `skill` tool so skill content can reference MCP servers discovered by this plugin
 3. `skill_mcp` tool with operation modes:
    - `tool_name`
    - `resource_name`
@@ -123,7 +123,7 @@ opencode-skill-mcp/
       env-cleaner.ts   # env hygiene for stdio subprocesses
       cleanup.ts       # idle timeout + process cleanup
     plugin/            # OpenCode integration
-      tools.ts         # skill + skill_mcp tool registration
+      tools.ts         # skill_mcp registration + shared validation helpers
       registry.ts      # skill loading, active-skill context
       capabilities.ts  # capability formatting for model context
       config.ts        # mcp.json + frontmatter parsing
@@ -257,7 +257,7 @@ Status legend: `pending` | `in_progress` | `blocked` | `done`
 | --- | ------------------------------------------------------------------------- | ------- | ---------------------------------------------------- |
 | T1  | Create standalone plugin skeleton (`opencode-skill-mcp`)                  | pending | single package, internal core/plugin split           |
 | T2  | Implement skill registry and MCP config parsing (`mcp.json`, frontmatter) | pending | Preserve OMO precedence: `mcp.json` over frontmatter |
-| T3  | Implement `skill` tool and capability rendering                           | pending | Include tools/resources/prompts summary              |
+| T3  | Integrate with OpenCode built-in `skill` flow and capability rendering    | pending | Keep plugin surface limited to `skill_mcp`           |
 | T4  | Implement core manager: get/create client, dedupe pending connects        | pending | session+skill+server cache key                       |
 | T5  | Implement stdio transport adapter with clean env and lifecycle cleanup    | pending | include idle timeout cleanup                         |
 | T6  | Implement http transport adapter (header-based auth only)                 | pending | OAuth punted in MVP                                  |
@@ -295,7 +295,7 @@ Status legend: `pending` | `in_progress` | `blocked` | `done`
 - stdio MCP happy path + crash/restart path
 - remote MCP happy path + timeout/reconnect path
 - capability listing correctness for tools/resources/prompts
-- `skill -> skill_mcp` flow end-to-end in one session
+- OpenCode built-in `skill` -> `skill_mcp` flow end-to-end in one session
 
 ### Manual checks
 
@@ -327,7 +327,7 @@ OMO logs: `/tmp/oh-my-opencode.log`
 1. Best place to persist loaded-skill state: per-session only or global runtime cache?
 2. ~~Should skill activation auto-connect all declared MCPs, or lazy-connect on first call?~~ **Closed: lazy-connect on first call (MVP scope).**
 3. Naming strategy for tool collisions across same `mcp_name` from different skills?
-4. Should progressive disclosure be a new tool (`skill_mcp_search`) or an optional mode on `skill()` (e.g., `mcp_detail=none|lite|full`)?
+4. Should progressive disclosure be a new tool (`skill_mcp_search`) or an optional mode on OpenCode's built-in `skill` flow (e.g., `mcp_detail=none|lite|full`)?
 5. Persistent catalog cache (across sessions) or session-only?
 6. How to present provenance to the model (why a tool was suggested) without bloating context?
 7. Where will the new repo live? (TBD — fresh standalone repo)

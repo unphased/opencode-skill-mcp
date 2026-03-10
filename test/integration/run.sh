@@ -29,9 +29,46 @@ pass() { echo -e "  ${GREEN}PASS${NC} $1"; ((PASS++)) || true; }
 fail() { echo -e "  ${RED}FAIL${NC} $1"; ((FAIL++)) || true; }
 skip() { echo -e "  ${YELLOW}SKIP${NC} $1"; ((SKIP++)) || true; }
 
+is_provider_connectivity_failure() {
+  local log_file="$1"
+  grep -q 'Was there a typo in the url or port?' "$log_file" 2>/dev/null || \
+    grep -q 'service=models.dev error=Unable to connect' "$log_file" 2>/dev/null
+}
+
 # --- Setup ---
 
 WORK_DIR=""
+OPENCODE_HOME=""
+OPENCODE_DATA_HOME=""
+OPENCODE_CONFIG_HOME=""
+OPENCODE_CACHE_HOME=""
+OPENCODE_STATE_HOME=""
+
+run_opencode() {
+  (
+    export HOME="$OPENCODE_HOME"
+    export XDG_DATA_HOME="$OPENCODE_DATA_HOME"
+    export XDG_CONFIG_HOME="$OPENCODE_CONFIG_HOME"
+    export XDG_CACHE_HOME="$OPENCODE_CACHE_HOME"
+    export XDG_STATE_HOME="$OPENCODE_STATE_HOME"
+    cd "$WORK_DIR"
+    opencode "$@"
+  )
+}
+
+run_opencode_timeout() {
+  local duration="$1"
+  shift
+  (
+    export HOME="$OPENCODE_HOME"
+    export XDG_DATA_HOME="$OPENCODE_DATA_HOME"
+    export XDG_CONFIG_HOME="$OPENCODE_CONFIG_HOME"
+    export XDG_CACHE_HOME="$OPENCODE_CACHE_HOME"
+    export XDG_STATE_HOME="$OPENCODE_STATE_HOME"
+    cd "$WORK_DIR"
+    timeout "$duration" opencode "$@"
+  )
+}
 
 setup_fixture() {
   WORK_DIR=$(mktemp -d)
@@ -42,6 +79,12 @@ setup_fixture() {
 
   # Create project structure
   mkdir -p "$WORK_DIR/.opencode/skills/test-skill"
+  OPENCODE_HOME="$WORK_DIR/.home"
+  OPENCODE_DATA_HOME="$WORK_DIR/.xdg-data"
+  OPENCODE_CONFIG_HOME="$WORK_DIR/.xdg-config"
+  OPENCODE_CACHE_HOME="$WORK_DIR/.xdg-cache"
+  OPENCODE_STATE_HOME="$WORK_DIR/.xdg-state"
+  mkdir -p "$OPENCODE_HOME" "$OPENCODE_DATA_HOME" "$OPENCODE_CONFIG_HOME" "$OPENCODE_CACHE_HOME" "$OPENCODE_STATE_HOME"
 
   # Plugin config — use file:// to load our local source (bun transpiles)
   local plugin_path
@@ -82,7 +125,7 @@ run_cli_tests() {
   echo ""
   echo "--- debug config ---"
   local config_tmp="$WORK_DIR/.test-config"
-  (cd "$WORK_DIR" && opencode debug config) 2>&1 | cat > "$config_tmp"
+  run_opencode debug config 2>&1 | cat > "$config_tmp"
 
   if grep -q "file://" "$config_tmp" 2>/dev/null; then
     pass "plugin appears in resolved config"
@@ -95,8 +138,8 @@ run_cli_tests() {
   echo ""
   echo "--- plugin loads + skill_mcp registered ---"
   local log_tmp="$WORK_DIR/.test-log"
-  (cd "$WORK_DIR" && timeout 120 opencode run --print-logs --log-level INFO \
-    --format json -m "$MODEL" "List your tools.") 2>&1 | cat > "$log_tmp"
+  run_opencode_timeout 120 run --print-logs --log-level INFO \
+    --format json -m "$MODEL" "List your tools." 2>&1 | cat > "$log_tmp"
 
   if grep -q "service=plugin.*loading plugin" "$log_tmp" 2>/dev/null; then
     pass "plugin loaded by opencode"
@@ -121,11 +164,13 @@ run_cli_tests() {
   echo ""
   echo "--- skill_mcp dispatch (echo server) ---"
   local echo_tmp="$WORK_DIR/.test-echo"
-  (cd "$WORK_DIR" && timeout 120 opencode run --format json -m "$MODEL" \
-    'Use skill_mcp to call the "echo" tool on the "echo-test" MCP server with arguments {"message": "integration-test-42"}. Report the exact output.') 2>&1 | cat > "$echo_tmp"
+  run_opencode_timeout 120 run --format json -m "$MODEL" \
+    'Use skill_mcp to call the "echo" tool on the "echo-test" MCP server with arguments {"message": "integration-test-42"}. Report the exact output.' 2>&1 | cat > "$echo_tmp"
 
   if grep -q "Echo: integration-test-42" "$echo_tmp" 2>/dev/null; then
     pass "skill_mcp echo dispatch returned correct result"
+  elif is_provider_connectivity_failure "$echo_tmp"; then
+    skip "skill_mcp echo dispatch skipped due to provider connectivity failure"
   else
     fail "skill_mcp echo dispatch did not return expected result"
     echo "    (last 3 lines):"
@@ -136,11 +181,13 @@ run_cli_tests() {
   echo ""
   echo "--- skill_mcp dispatch (add tool) ---"
   local add_tmp="$WORK_DIR/.test-add"
-  (cd "$WORK_DIR" && timeout 120 opencode run --format json -m "$MODEL" \
-    'Use skill_mcp to call the "add" tool on the "echo-test" MCP server with arguments {"a": 17, "b": 25}. Report the exact numeric result.') 2>&1 | cat > "$add_tmp"
+  run_opencode_timeout 120 run --format json -m "$MODEL" \
+    'Use skill_mcp to call the "add" tool on the "echo-test" MCP server with arguments {"a": 17, "b": 25}. Report the exact numeric result.' 2>&1 | cat > "$add_tmp"
 
   if grep -q "42" "$add_tmp" 2>/dev/null; then
     pass "skill_mcp add dispatch returned 42"
+  elif is_provider_connectivity_failure "$add_tmp"; then
+    skip "skill_mcp add dispatch skipped due to provider connectivity failure"
   else
     fail "skill_mcp add dispatch did not return 42"
     echo "    (last 3 lines):"
@@ -188,7 +235,7 @@ run_tui_tests() {
   echo ""
   echo "--- starting opencode in tmux ---"
   tmux new-session -d -s opencode-test -x 200 -y 50 \
-    "cd '$WORK_DIR' && opencode 2>/tmp/opencode-test-stderr.log"
+    "cd '$WORK_DIR' && HOME='$OPENCODE_HOME' XDG_DATA_HOME='$OPENCODE_DATA_HOME' XDG_CONFIG_HOME='$OPENCODE_CONFIG_HOME' XDG_CACHE_HOME='$OPENCODE_CACHE_HOME' XDG_STATE_HOME='$OPENCODE_STATE_HOME' opencode 2>/tmp/opencode-test-stderr.log"
 
   # Wait for TUI to initialize (status bar shows version number)
   if tmux_wait_for opencode-test "1\.[0-9]\.[0-9]|opencode|master|main" 15; then
