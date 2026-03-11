@@ -59,7 +59,19 @@ describe("SkillRegistry", () => {
     expect(resolved?.config.args).toEqual(["second"])
   })
 
-  it("drops sessions without any skill MCP config", () => {
+  it("does not leak loaded skills across sessions", () => {
+    const registry = new SkillRegistry()
+
+    registry.activateSkill("session-a", {
+      name: "alpha",
+      resolvedPath: "/tmp/alpha",
+      mcpConfig: { shared: { command: "node" } },
+    })
+
+    expect(registry.resolveServer("session-b", "shared")).toBeNull()
+  })
+
+  it("drops entries without MCP config", () => {
     const registry = new SkillRegistry()
 
     registry.activateSkill("session-a", {
