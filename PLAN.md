@@ -262,22 +262,21 @@ Status legend: `pending` | `in_progress` | `partial` | `blocked` | `done`
 | T5  | Implement stdio transport adapter with clean env and lifecycle cleanup    | done    | includes idle cleanup and process cleanup hooks      |
 | T6  | Implement http transport adapter (header-based auth only)                 | done    | HTTP transport works; OAuth still intentionally out  |
 | T7  | Implement `skill_mcp` dispatcher tool contract and JSON args parsing      | done    | tool/resource/prompt modes implemented               |
-| T8  | Integrate with OpenCode runtime tool exposure and permissions             | partial | plugin loads in OpenCode CLI; deeper permission verification still manual |
+| T8  | Integrate with OpenCode runtime tool exposure and permissions             | done    | plugin glue covered by unit tests; OpenCode CLI harness verifies runtime tool exposure |
 | T9  | Add retry/reconnect/error-shaping behavior tests                          | done    | manager/unit coverage now exercises retry behavior   |
 | T10 | Integration test with sample skill and sample MCP servers                 | done    | stdio covered in OpenCode CLI harness; remote HTTP covered in local transport integration test |
 | T11 | Author docs: install, usage, skill format, troubleshooting                | done    | README added                                         |
 
 ### Current Completion Summary
 
-- Core implementation: complete for the intended MVP
-- Automated local verification: strong for unit coverage and OpenCode CLI/plugin loading
-- Remaining gaps: provider-connected end-to-end validation inside a live OpenCode session
+- MVP implementation: complete for the intended OMO-style skill activation flow
+- Automated verification: strong across unit coverage, plugin glue, transport behavior, and OpenCode CLI/plugin loading
+- Remaining validation: provider-connected `skill -> skill_mcp` execution inside a live OpenCode session
 
 ### Next Iteration Targets
 
-1. Validate provider-connected `skill -> skill_mcp` execution in a live OpenCode environment
-2. Reassess whether any V2 progressive-disclosure work is still needed after the compact capability output changes
-3. Decide whether any additional permission-hook coverage is worth automating or should stay manual
+1. Run the provider-connected manual verification steps below in a normal OpenCode environment
+2. Only reopen V2 work if the compact appendix still proves too expensive in real usage
 
 ---
 
@@ -346,13 +345,13 @@ OMO logs: `/tmp/oh-my-opencode.log`
 
 ## Open Questions (Track Until Closed)
 
-1. Best place to persist loaded-skill state: per-session only or global runtime cache?
-2. ~~Should skill activation auto-connect all declared MCPs, or lazy-connect on first call?~~ **Closed: lazy-connect on first call (MVP scope).**
-3. Naming strategy for tool collisions across same `mcp_name` from different skills?
-4. Should progressive disclosure be a new tool (`skill_mcp_search`) or an optional mode on OpenCode's built-in `skill` flow (e.g., `mcp_detail=none|lite|full`)?
-5. Persistent catalog cache (across sessions) or session-only?
-6. How to present provenance to the model (why a tool was suggested) without bloating context?
-7. Where will the new repo live? (TBD — fresh standalone repo)
+1. ~~Best place to persist loaded-skill state: per-session only or global runtime cache?~~ **Closed: per-session only.**
+2. ~~Should skill activation auto-connect all declared MCPs, or lazy-connect on first call?~~ **Closed: skill activation may inspect capabilities, but execution remains scoped to the currently loaded skill session.**
+3. ~~Naming strategy for tool collisions across same `mcp_name` from different skills?~~ **Closed: most recently loaded skill wins within a session.**
+4. ~~Should progressive disclosure be a new tool (`skill_mcp_search`) or an optional mode on OpenCode's built-in `skill` flow (e.g., `mcp_detail=none|lite|full`)?~~ **Closed for MVP: compact appendix on built-in `skill` output; no extra search tool.**
+5. ~~Persistent catalog cache (across sessions) or session-only?~~ **Closed for MVP: session-only behavior.**
+6. ~~How to present provenance to the model (why a tool was suggested) without bloating context?~~ **Closed for MVP: compact appendix with server-scoped capability hints only.**
+7. ~~Where will the new repo live?~~ **Closed: standalone repo at `unphased/opencode-skill-mcp`.**
 
 ---
 

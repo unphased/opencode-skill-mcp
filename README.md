@@ -20,7 +20,8 @@ Core behavior is implemented:
 Still limited:
 
 - end-to-end model-driven dispatch tests depend on provider availability
-- remote HTTP MCP integration coverage is not yet implemented
+- full OpenCode-provider end-to-end coverage is still only automated for the local stdio fixture
+- remote HTTP MCP coverage exists at the transport layer, not yet through an OpenCode session harness
 
 ## Install
 
