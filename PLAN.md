@@ -251,21 +251,33 @@ Return only the selected tool's schema or args template.
 
 ## Work Tracker
 
-Status legend: `pending` | `in_progress` | `blocked` | `done`
+Status legend: `pending` | `in_progress` | `partial` | `blocked` | `done`
 
 | ID  | Task                                                                      | Status  | Notes                                                |
 | --- | ------------------------------------------------------------------------- | ------- | ---------------------------------------------------- |
-| T1  | Create standalone plugin skeleton (`opencode-skill-mcp`)                  | pending | single package, internal core/plugin split           |
-| T2  | Implement skill registry and MCP config parsing (`mcp.json`, frontmatter) | pending | Preserve OMO precedence: `mcp.json` over frontmatter |
-| T3  | Integrate with OpenCode built-in `skill` flow and capability rendering    | pending | Keep plugin surface limited to `skill_mcp`           |
-| T4  | Implement core manager: get/create client, dedupe pending connects        | pending | session+skill+server cache key                       |
-| T5  | Implement stdio transport adapter with clean env and lifecycle cleanup    | pending | include idle timeout cleanup                         |
-| T6  | Implement http transport adapter (header-based auth only)                 | pending | OAuth punted in MVP                                  |
-| T7  | Implement `skill_mcp` dispatcher tool contract and JSON args parsing      | pending | exactly one op among tool/resource/prompt            |
-| T8  | Integrate with OpenCode runtime tool exposure and permissions             | pending | verify model sees tools correctly                    |
-| T9  | Add retry/reconnect/error-shaping behavior tests                          | pending | ensure no infinite retry loops                       |
-| T10 | Integration test with sample skill and sample MCP servers                 | pending | one stdio + one remote                               |
-| T11 | Author docs: install, usage, skill format, troubleshooting                | pending | include examples and failure modes                   |
+| T1  | Create standalone plugin skeleton (`opencode-skill-mcp`)                  | done    | package, core/, plugin/, tests, build wiring exist   |
+| T2  | Implement skill registry and MCP config parsing (`mcp.json`, frontmatter) | done    | session-scoped registry; `mcp.json` still wins       |
+| T3  | Integrate with OpenCode built-in `skill` flow and capability rendering    | done    | hooked via `tool.execute.after` on built-in `skill`  |
+| T4  | Implement core manager: get/create client, dedupe pending connects        | done    | session+skill+server cache key implemented           |
+| T5  | Implement stdio transport adapter with clean env and lifecycle cleanup    | done    | includes idle cleanup and process cleanup hooks      |
+| T6  | Implement http transport adapter (header-based auth only)                 | done    | HTTP transport works; OAuth still intentionally out  |
+| T7  | Implement `skill_mcp` dispatcher tool contract and JSON args parsing      | done    | tool/resource/prompt modes implemented               |
+| T8  | Integrate with OpenCode runtime tool exposure and permissions             | partial | plugin loads in OpenCode CLI; deeper permission verification still manual |
+| T9  | Add retry/reconnect/error-shaping behavior tests                          | done    | manager/unit coverage now exercises retry behavior   |
+| T10 | Integration test with sample skill and sample MCP servers                 | done    | stdio covered in OpenCode CLI harness; remote HTTP covered in local transport integration test |
+| T11 | Author docs: install, usage, skill format, troubleshooting                | done    | README added                                         |
+
+### Current Completion Summary
+
+- Core implementation: complete for the intended MVP
+- Automated local verification: strong for unit coverage and OpenCode CLI/plugin loading
+- Remaining gaps: provider-connected end-to-end validation inside a live OpenCode session
+
+### Next Iteration Targets
+
+1. Validate provider-connected `skill -> skill_mcp` execution in a live OpenCode environment
+2. Reassess whether any V2 progressive-disclosure work is still needed after the compact capability output changes
+3. Decide whether any additional permission-hook coverage is worth automating or should stay manual
 
 ---
 
@@ -303,6 +315,16 @@ Status legend: `pending` | `in_progress` | `blocked` | `done`
 - Invoke `skill_mcp` with each operation type
 - Confirm tool visibility refreshes on subsequent prompts
 - Confirm disconnect cleanup leaves no orphan process
+
+### Manual checks still useful in a provider-connected environment
+
+1. From the repo root, run `npm run test:integration`
+2. In a normal OpenCode session, ask the model to load `test-skill`
+3. Confirm the loaded skill output includes `## Skill MCPs`
+4. Ask the model to call:
+   `skill_mcp(mcp_name="echo-test", tool_name="echo", arguments={"message":"manual-check"})`
+5. Confirm the response includes `Echo: manual-check`
+6. Repeat with the `add` tool and confirm the numeric result
 
 ### Debugging reference
 
